@@ -11,13 +11,13 @@ from datetime import datetime
 # Inicialização do cliente
 client = UMFutures(key=api, secret=secret)
 
-tp = 0.012 # take profit (se você colocar 0.012, então você terá 1,0% de lucro)
-sl = 0.007 # stop loss (se você colocar 0.005, então você terá 0,7% de perda) 
-volume = 30 # volume para uma ordem (volume / leverage = preço da ordem)
+tp = 0.006 # take profit (se você colocar 0.010, então você terá 1,0% de lucro)
+sl = 0.004 # stop loss (se você colocar 0.005, então você terá 0,5% de perda) 
+volume = 50 # volume para uma ordem (volume / leverage = preço da ordem)
 leverage = 10  # alavancagem
 margin_mode = 'ISOLATED' # tipo é 'ISOLATED' ou 'CROSS'
-qty = 2 # Quantidade de posições abertas simultaneamente
-time_period = '15m' # período de tempo para velas
+qty = 3 # Quantidade de posições abertas simultaneamente
+time_period = '5m' # período de tempo para velas
 
 # obtendo seu saldo de futuros em USDT
 def get_balance_usdt():
@@ -111,41 +111,33 @@ def open_order(symbol, side):
     if side == 'buy':
         try:
             resp1 = client.new_order(symbol=symbol, side='BUY', type='MARKET', quantity=qty)
-            print(symbol, side, "colocando ordem")
-            print(resp1)
+            print(f"$$$$$$$$$$$$$$$ => CRIANDO OPERAÇÃO DE {side.upper()} PARA {symbol}")
+            print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo: {resp1['type']}, Ordem: {resp1['orderId']}")
             sleep(2)
             sl_price = round(price - price*sl, price_precision)
             resp2 = client.new_order(symbol=symbol, side='SELL', type='STOP_MARKET', quantity=qty, timeInForce='GTC', stopPrice=sl_price)
-            print(resp2)
+            print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo:  {resp2['type']}, Ordem: {resp2['orderId']}")
             sleep(2)
             tp_price = round(price + price * tp, price_precision)
             resp3 = client.new_order(symbol=symbol, side='SELL', type='TAKE_PROFIT_MARKET', quantity=qty, timeInForce='GTC', stopPrice=tp_price)
-            print(resp3)
+            print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo:  {resp3['type']}, Ordem: {resp3['orderId']}")
         except ClientError as error:
-            print(
-                "Erro encontrado. status: {}, código de erro: {}, mensagem de erro: {}".format(
-                    error.status_code, error.error_code, error.error_message
-                )
-            )
+            print(f"Erro encontrado. status: {error.status_code}, código de erro: {error.error_code}, mensagem de erro: {error.error_message}")
     if side == 'sell':
         try:
             resp1 = client.new_order(symbol=symbol, side='SELL', type='MARKET', quantity=qty)
-            print(symbol, side, "colocando ordem")
-            print(resp1)
+            print(f"$$$$$$$$$$$$$$$ => CRIANDO OPERAÇÃO DE {side.upper()} PARA {symbol}")
+            print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo:  {resp1['type']}, Ordem: {resp1['orderId']}")
             sleep(2)
             sl_price = round(price + price*sl, price_precision)
             resp2 = client.new_order(symbol=symbol, side='BUY', type='STOP_MARKET', quantity=qty, timeInForce='GTC', stopPrice=sl_price)
-            print(resp2)
+            print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo:  {resp2['type']}, Ordem: {resp2['orderId']}")
             sleep(2)
             tp_price = round(price - price * tp, price_precision)
             resp3 = client.new_order(symbol=symbol, side='BUY', type='TAKE_PROFIT_MARKET', quantity=qty, timeInForce='GTC', stopPrice=tp_price)
-            print(resp3)
+            print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo:  {resp3['type']}, Ordem: {resp3['orderId']}")
         except ClientError as error:
-            print(
-                "Erro encontrado. status: {}, código de erro: {}, mensagem de erro: {}".format(
-                    error.status_code, error.error_code, error.error_message
-                )
-            )
+            print(f"Erro encontrado. status: {error.status_code}, código de erro: {error.error_code}, mensagem de erro: {error.error_message}")
 
 # Suas posições atuais (retorna a lista de símbolos):
 def get_pos():
@@ -321,11 +313,11 @@ while True:
     if balance == None:
         print("Não é possível conectar-se à API. Verifique o IP, as restrições ou espere algum tempo")
     if balance != None:
-        print(f">>>>>>>>>>>>>> Meu saldo é: {balance} USDT")
+        print(f"---------------> Meu saldo é: {balance} USDT")
         ## obtendo lista de posição:
         pos = []
         pos = get_pos()
-        print(f'>>>>>>>>>>>>>> Você tem {len(pos)} posições abertas: {pos}')
+        print(f'---------------> Você tem {len(pos)} posições abertas: {pos}')
         ## Obtendo lista de ordens
         ord = []
         ord = check_orders()
@@ -334,7 +326,7 @@ while True:
             if not elem in pos:
                 close_open_orders(elem)
         if len(pos) < qty:
-            print(">>>>>>>>>>>>>> Verificando TODOS os símbolos disponíveis...")
+            print("---------------> Verificando TODOS os símbolos disponíveis...")
             for elem in symbols:
                 # Estratégias (você pode criar a sua própria com a biblioteca TA):
                 # signal = stochastic_signal(elem)
@@ -348,41 +340,38 @@ while True:
                 # também não precisamos de USDTUSDC porque é 1:1 (não precisamos gastar dinheiro com a comissão)
                 if len(pos) < qty:
                     if signal == 'up' and elem != 'USDCUSDT' and not elem in pos and not elem in ord and elem != symbol:
-                        print('>>>>>>>>>>>>>> Sinal de COMPRA encontrado para ', elem)
+                        print('---------------> Sinal de COMPRA encontrado para ', elem)
                         set_mode(elem, margin_mode)
                         sleep(1)
                         set_leverage(elem, leverage)
                         sleep(1)
-                        print('>>>>>>>>>>>>>> Colocando ordem para ', elem)
                         open_order(elem, 'buy')
                         symbol = elem
                         order = True
                         pos = get_pos()
                         sleep(1)
                         ord = check_orders()
-                        sleep(1)
                         sleep(10)
-                        # break
+                        continue
                     if signal == 'down' and elem != 'USDCUSDT' and not elem in pos and not elem in ord and elem != symbol:
-                        print('>>>>>>>>>>>>>> Sinal de VENDA encontrado para ', elem)
+                        print('---------------> Sinal de VENDA encontrado para ', elem)
                         set_mode(elem, margin_mode)
                         sleep(1)
                         set_leverage(elem, leverage)
                         sleep(1)
-                        print('>>>>>>>>>>>>>> Colocando ordem para ', elem)
                         open_order(elem, 'sell')
                         symbol = elem
                         order = True
                         pos = get_pos()
                         sleep(1)
                         ord = check_orders()
-                        sleep(1)
                         sleep(10)
-                        # break
+                        continue
                 else:
-                    print(">>>>>>>>>>>>>> LIMITE DE POSIÇÕES ATINGIDO")
-                    sys.exit()
+                    print(f'---------------> Você já tem {len(pos)} de {qty} posições abertas: {pos}')
+                    break
+                    #sys.exit()
     hora_atual = datetime.now()
     hora_atual_formatada = hora_atual.strftime("%H:%M:%S")
-    print(f">>>>>>>>>>>>>> Aguardando 2 minutos a partir de {hora_atual_formatada}")
+    print(f"---------------> Aguardando 2 minutos a partir de {hora_atual_formatada}")
     sleep(120)
