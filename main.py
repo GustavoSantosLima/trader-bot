@@ -1,10 +1,12 @@
 # Importações necessárias
+import sys
 from keys import api, secret
-from binance.um_futures import UMFutures
-import ta
-import pandas as pd
+from binance.um_futures import UMFutures # type: ignore
+import ta # type: ignore
+import pandas as pd # type: ignore
 from time import sleep
-from binance.error import ClientError
+from binance.error import ClientError # type: ignore
+from datetime import datetime
 
 # Inicialização do cliente
 client = UMFutures(key=api, secret=secret)
@@ -13,8 +15,9 @@ tp = 0.012 # take profit (se você colocar 0.012, então você terá 1,0% de luc
 sl = 0.007 # stop loss (se você colocar 0.005, então você terá 0,7% de perda) 
 volume = 30 # volume para uma ordem (volume / leverage = preço da ordem)
 leverage = 10  # alavancagem
-type = 'ISOLATED' # tipo é 'ISOLATED' ou 'CROSS'
+margin_mode = 'ISOLATED' # tipo é 'ISOLATED' ou 'CROSS'
 qty = 2 # Quantidade de posições abertas simultaneamente
+time_period = '15m' # período de tempo para velas
 
 # obtendo seu saldo de futuros em USDT
 def get_balance_usdt():
@@ -43,7 +46,7 @@ def get_tickers_usdt():
 # Obtendo velas para o símbolo necessário, é um dataframe com 'Time', 'Open', 'High', 'Low', 'Close', 'Volume'
 def klines(symbol):
     try:
-        resp = pd.DataFrame(client.klines(symbol, '15m'))
+        resp = pd.DataFrame(client.klines(symbol, time_period))
         resp = resp.iloc[:,:6]
         resp.columns = ['Time', 'Open', 'High', 'Low', 'Close', 'Volume']
         resp = resp.set_index('Time')
@@ -72,10 +75,10 @@ def set_leverage(symbol, level):
         )
 
 # O mesmo para o tipo de margem
-def set_mode(symbol, type):
+def set_mode(symbol, margin_mode):
     try:
         response = client.change_margin_type(
-            symbol=symbol, marginType=type, recvWindow=6000
+            symbol=symbol, marginType=margin_mode, recvWindow=6000
         )
         print(response)
     except ClientError as error:
@@ -187,8 +190,8 @@ def close_open_orders(symbol):
             )
         )
 
-# Estratégia. Pode usar qualquer outra:
-def str_signal(symbol):
+# Estratégia baseada no indicador RSI, estocástico RSI e média móvel exponencial de 200 períodos (EMA).
+def stochastic_signal(symbol):
     kl = klines(symbol)
     rsi = ta.momentum.RSIIndicator(kl.Close).rsi()
     rsi_k = ta.momentum.StochRSIIndicator(kl.Close).stochrsi_k()
@@ -213,7 +216,7 @@ def rsi_signal(symbol):
     else:
         return 'none'
 
-# Estratégia baseada no indicador MACD (Moving Average Convergence Divergence) e na média móvel exponencial de 200 períodos (EMA).
+# Estratégia baseada no indicador MACD e na média móvel exponencial de 200 períodos (EMA).
 def macd_ema(symbol):
     kl = klines(symbol)
     macd = ta.trend.macd_diff(kl.Close)
@@ -254,7 +257,7 @@ def stochastic_rsi_signal(symbol):
     else:
         return 'none'  # Nenhum sinal claro
 
-# Estratégia baseada no indicador MACD (Moving Average Convergence Divergence) e na média móvel exponencial de 12 períodos (EMA) e 26 períodos (EMA).
+# Estratégia baseada no indicador MACD e na média móvel exponencial de 12 períodos (EMA) e 26 períodos (EMA).
 def macd_crossover_signal(symbol):
     kl = klines(symbol)
     macd = ta.trend.macd_diff(kl.Close)  # Diferença entre as médias móveis exponenciais
@@ -288,21 +291,26 @@ def bollinger_strategy(symbol):
     # Calculando as bandas de Bollinger
     period = 20  # Período para a média móvel
     std_dev = 2  # Desvio padrão
-    kl['SMA'] = kl['Close'].rolling(window=period).mean()  # Média móvel simples
-    kl['Upper'] = kl['SMA'] + (std_dev * kl['Close'].rolling(window=period).std())  # Banda superior
-    kl['Lower'] = kl['SMA'] - (std_dev * kl['Close'].rolling(window=period).std())  # Banda inferior
+
+    # Calcular a média móvel simples (SMA)
+    kl['SMA'] = kl['Close'].rolling(window=period).mean()
+
+    # Calcular as bandas superior e inferior
+    kl['Upper'] = kl['SMA'] + (std_dev * kl['Close'].rolling(window=period).std())
+    kl['Lower'] = kl['SMA'] - (std_dev * kl['Close'].rolling(window=period).std())
     
     # Verificando se o preço está acima da banda superior
     if kl['Close'].iloc[-1] > kl['Upper'].iloc[-1]:
-        return 'sell'  # Sinal de venda
+        return 'down'
     # Verificando se o preço está abaixo da banda inferior
     elif kl['Close'].iloc[-1] < kl['Lower'].iloc[-1]:
-        return 'buy'  # Sinal de compra
+        return 'up'
     else:
-        return 'hold'  # Sem sinal claro
+        return 'none'
 
 orders = 0
 symbol = ''
+
 # obtendo todos os símbolos da lista de Futuros da Binance:
 symbols = get_tickers_usdt()
 
@@ -311,13 +319,13 @@ while True:
     balance = get_balance_usdt()
     sleep(1)
     if balance == None:
-        print('Não é possível conectar-se à API. Verifique o IP, as restrições ou espere algum tempo')
+        print("Não é possível conectar-se à API. Verifique o IP, as restrições ou espere algum tempo")
     if balance != None:
-        print("Meu saldo é: ", balance, " USDT")
+        print(f">>>>>>>>>>>>>> Meu saldo é: {balance} USDT")
         ## obtendo lista de posição:
         pos = []
         pos = get_pos()
-        print(f'Você tem {len(pos)} posições abertas: {pos}')
+        print(f'>>>>>>>>>>>>>> Você tem {len(pos)} posições abertas: {pos}')
         ## Obtendo lista de ordens
         ord = []
         ord = check_orders()
@@ -326,25 +334,26 @@ while True:
             if not elem in pos:
                 close_open_orders(elem)
         if len(pos) < qty:
+            print(">>>>>>>>>>>>>> Verificando TODOS os símbolos disponíveis...")
             for elem in symbols:
                 # Estratégias (você pode criar a sua própria com a biblioteca TA):
-                # signal = str_signal(elem)
+                # signal = stochastic_signal(elem)
                 # signal = rsi_signal(elem)
                 # signal = macd_ema(elem)
                 # signal = macd_crossover_signal(elem)
                 # signal = stochastic_rsi_signal(elem)
-                signal = ema_crossover_signal(elem)
-                # signal = bollinger_strategy(elem)
+                # signal = ema_crossover_signal(elem)
+                signal = bollinger_strategy(elem)
                 # sinal 'up' ou 'down', colocamos ordens para símbolos que não estão nas posições abertas e ordens
                 # também não precisamos de USDTUSDC porque é 1:1 (não precisamos gastar dinheiro com a comissão)
                 if len(pos) < qty:
                     if signal == 'up' and elem != 'USDCUSDT' and not elem in pos and not elem in ord and elem != symbol:
-                        print('Sinal de COMPRA encontrado para ', elem)
-                        set_mode(elem, type)
+                        print('>>>>>>>>>>>>>> Sinal de COMPRA encontrado para ', elem)
+                        set_mode(elem, margin_mode)
                         sleep(1)
                         set_leverage(elem, leverage)
                         sleep(1)
-                        print('Colocando ordem para ', elem)
+                        print('>>>>>>>>>>>>>> Colocando ordem para ', elem)
                         open_order(elem, 'buy')
                         symbol = elem
                         order = True
@@ -355,12 +364,12 @@ while True:
                         sleep(10)
                         # break
                     if signal == 'down' and elem != 'USDCUSDT' and not elem in pos and not elem in ord and elem != symbol:
-                        print('Sinal de VENDA encontrado para ', elem)
-                        set_mode(elem, type)
+                        print('>>>>>>>>>>>>>> Sinal de VENDA encontrado para ', elem)
+                        set_mode(elem, margin_mode)
                         sleep(1)
                         set_leverage(elem, leverage)
                         sleep(1)
-                        print('Colocando ordem para ', elem)
+                        print('>>>>>>>>>>>>>> Colocando ordem para ', elem)
                         open_order(elem, 'sell')
                         symbol = elem
                         order = True
@@ -371,7 +380,9 @@ while True:
                         sleep(10)
                         # break
                 else:
-                    print('---------- >>> LIMITE DE POSIÇÕES ATINGIDO <<< ----------')
-                    break
-    print('Aguardando 3 minutos')
-    sleep(180)
+                    print(">>>>>>>>>>>>>> LIMITE DE POSIÇÕES ATINGIDO")
+                    sys.exit()
+    hora_atual = datetime.now()
+    hora_atual_formatada = hora_atual.strftime("%H:%M:%S")
+    print(f">>>>>>>>>>>>>> Aguardando 2 minutos a partir de {hora_atual_formatada}")
+    sleep(120)
