@@ -1,0 +1,45 @@
+# Arquivos Python compilados
+*.pyc
+__pycache__/
+
+# Ambiente virtual (ex: virtualenv, pipenv, poetry)
+venv/
+env/
+.venv/
+.venv2/
+env/
+bin/
+include/
+lib/
+Lib/
+Scripts/
+pyvenv.cfg
+pip-selfcheck.json
+
+# Arquivos de configuração local (ex: IDEs, editores)
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.komodoproject
+.settings/
+*.tmproj
+*.esproj
+*.db
+*.bak
+
+# Arquivos de log e dados
+*.log
+*.csv
+
+# Arquivos de cache e backup
+*.cache
+*.swp
+*~
+*.bak
+*.backup
+
+# Outros arquivos e diretórios
+.DS_Store
+Thumbs.db
+keys.py
