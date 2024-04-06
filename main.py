@@ -160,9 +160,17 @@ def close_open_orders(symbol):
     except ClientError as error:
         print(f"Erro encontrado. status: {error.status_code}, código de erro: {error.error_code}, mensagem de erro: {error.error_message}")
 
+# Obter a hora atual
 def get_hour():
     hora_atual = datetime.now()
     return hora_atual.strftime("%H:%M:%S")
+
+# Fechar ordens de stop para posições fechadas
+def close_orders_not_in_position(ord, pos):
+    print(f"===============> CHECANDO ORDENS DE STOP PARA POSIÇÕES FECHADAS...")
+    for elem in ord:
+        if not elem in pos:
+            close_open_orders(elem)
 
 # Estratégia baseada no indicador Bollinger Bands (Bandas de Bollinger).
 def bollinger_strategy(symbol):
@@ -217,9 +225,7 @@ while True:
         ord = []
         ord = check_orders()
         ## removendo ordens de stop para posições fechadas
-        for elem in ord:
-            if not elem in pos:
-                close_open_orders(elem)
+        close_orders_not_in_position(ord, pos)
         if len(pos) < qty:
             print("---------------> Verificando TODOS os símbolos disponíveis...")
             for elem in symbols:
@@ -258,9 +264,7 @@ while True:
                         continue
                 else:
                     print(f'---------------> Você já tem {len(pos)} de {qty} posições abertas: {pos}')
+                    close_orders_not_in_position(ord, pos)
                     break
     print(f"---------------> Aguardando 2 minutos a partir de {get_hour()}")
-    for elem in ord:
-        if not elem in pos:
-            close_open_orders(elem)
     sleep(120)
