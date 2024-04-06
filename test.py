@@ -1,15 +1,20 @@
-from binance.client import Client
-from secrets import api_key, api_secret
-import time
+# importe o list_report.py
+from report import list_report
 
-client = Client(api_key, api_secret)
+sum_pnl = 0
+sum_cost = 0
 
-# pegar informações da conta
-account = client.get_account()
+for item in list_report:
+    symbol = item['symbol']
+    pnl = item['Closing PNL']
+    transaction_fee = item['Transaction Fee']
+    foundin_fee = item['Funding Fee']
+    fee_bnb = item['Transaction Fee(BNB)']
+    cost_fee = round(transaction_fee + foundin_fee + fee_bnb, 4)
 
-# pegar informações do saldo
-balance = account['balances']
+    sum_pnl += pnl
+    sum_cost += cost_fee
 
-for asset in balance:
-    if float(asset['free']) > 0.0:
-        print(f"{asset['asset']}: {asset['free']}")
+    #print(f"PNL: {pnl}, Taxax: {cost_fee}")
+
+print(f"TOTAL: \nGanho: {round(sum_pnl, 2)} \nTaxa: {round(sum_cost, 2)} \nSaldo: {round(sum_pnl - abs(sum_cost), 2)}")

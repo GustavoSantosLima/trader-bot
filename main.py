@@ -105,7 +105,7 @@ def open_order(symbol, side, price_simple_median):
             if price_simple_median < tp_price:
                 tp_price = round(price_simple_median, price_precision)
             resp3 = client.new_order(symbol=symbol, side='SELL', type='TAKE_PROFIT_MARKET', quantity=qty, timeInForce='GTC', stopPrice=tp_price)
-            print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo: {resp3['type']}, Ordem: {resp3['orderId']}, Preço: {tp_price}/{round(price_simple_median, price_precision)}")
+            print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo: {resp3['type']}, Ordem: {resp3['orderId']}")
         except ClientError as error:
             print(f"Erro encontrado. status: {error.status_code}, código de erro: {error.error_code}, mensagem de erro: {error.error_message}")
     if side == 'sell':
@@ -122,7 +122,7 @@ def open_order(symbol, side, price_simple_median):
             if price_simple_median > tp_price:
                 tp_price = round(price_simple_median, price_precision)
             resp3 = client.new_order(symbol=symbol, side='BUY', type='TAKE_PROFIT_MARKET', quantity=qty, timeInForce='GTC', stopPrice=tp_price)
-            print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo: {resp3['type']}, Ordem: {resp3['orderId']}, Preço: {tp_price}/{round(price_simple_median, price_precision)}")
+            print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo: {resp3['type']}, Ordem: {resp3['orderId']}")
         except ClientError as error:
             print(f"Erro encontrado. status: {error.status_code}, código de erro: {error.error_code}, mensagem de erro: {error.error_message}")
 
@@ -153,7 +153,10 @@ def check_orders():
 def close_open_orders(symbol):
     try:
         response = client.cancel_open_orders(symbol=symbol, recvWindow=6000)
-        print(response)
+        if response['code'] == 200:
+            print(f"===============> ORDENS DE STOP PARA {symbol} FORAM FECHADAS COM SUCESSO")
+        else:
+            print(response)
     except ClientError as error:
         print(f"Erro encontrado. status: {error.status_code}, código de erro: {error.error_code}, mensagem de erro: {error.error_message}")
 
@@ -199,9 +202,12 @@ while True:
     if balance == None:
         print("Não é possível conectar-se à API. Verifique o IP, as restrições ou espere algum tempo")
     if balance != None:
-        print(f"---------------> Meu saldo é: {balance} USDT - {get_hour()}")
-        if balance < 35:
-            print("---------------> O LIMITE QUE VOCÊ DEFINIU FOI ATINGIDO. VOCÊ NÃO PODE MAIS OPERAR.")
+        print("####################################################################")
+        print(f"---------------> MEU SALDO: {round(balance, 2)} USDT - {get_hour()}")
+        print("####################################################################")
+        ## Se o saldo for menor que 35 USDT, você não pode mais operar
+        if balance < 30:
+            print("---------------> SALDO LIMITE ATINGIDO. VOCÊ NÃO PODE MAIS OPERAR.")
             sys.exit()
         ## obtendo lista de posição:
         pos = []
@@ -253,6 +259,8 @@ while True:
                 else:
                     print(f'---------------> Você já tem {len(pos)} de {qty} posições abertas: {pos}')
                     break
-                    #sys.exit()  
     print(f"---------------> Aguardando 2 minutos a partir de {get_hour()}")
+    for elem in ord:
+        if not elem in pos:
+            close_open_orders(elem)
     sleep(120)
