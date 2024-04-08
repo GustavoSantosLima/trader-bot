@@ -17,7 +17,8 @@ volume = 50 # volume para uma ordem (volume / leverage = preço da ordem)
 leverage = 10  # alavancagem
 margin_mode = 'ISOLATED' # tipo é 'ISOLATED' ou 'CROSS'
 qty = 3 # Quantidade de posições abertas simultaneamente
-time_period = '5m' # período de tempo para velas
+TIME_PERIOD = '5m' # período de tempo para velas
+LIMIT_EXIT = 15 # limite de saldo para sair do programa
 
 # obtendo seu saldo de futuros em USDT
 def get_balance_usdt():
@@ -34,14 +35,14 @@ def get_tickers_usdt():
     tickers = []
     resp = client.ticker_price()
     for elem in resp:
-        if 'USDT' in elem['symbol']:
+        if 'USDT' in elem['symbol'] and '_' not in elem['symbol']:
             tickers.append(elem['symbol'])
     return tickers
 
 # Obtendo velas para o símbolo necessário, é um dataframe com 'Time', 'Open', 'High', 'Low', 'Close', 'Volume'
 def klines(symbol):
     try:
-        resp = pd.DataFrame(client.klines(symbol, time_period))
+        resp = pd.DataFrame(client.klines(symbol, TIME_PERIOD))
         resp = resp.iloc[:,:6]
         resp.columns = ['Time', 'Open', 'High', 'Low', 'Close', 'Volume']
         resp = resp.set_index('Time')
@@ -102,7 +103,7 @@ def open_order(symbol, side, price_simple_median):
             print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo: {resp2['type']}, Ordem: {resp2['orderId']}")
             sleep(2)
             tp_price = round(price + price * tp, price_precision)
-            if price_simple_median < tp_price:
+            if price_simple_median > 0 & price_simple_median < tp_price:
                 tp_price = round(price_simple_median, price_precision)
             resp3 = client.new_order(symbol=symbol, side='SELL', type='TAKE_PROFIT_MARKET', quantity=qty, timeInForce='GTC', stopPrice=tp_price)
             print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo: {resp3['type']}, Ordem: {resp3['orderId']}")
@@ -119,7 +120,7 @@ def open_order(symbol, side, price_simple_median):
             print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo: {resp2['type']}, Ordem: {resp2['orderId']}")
             sleep(2)
             tp_price = round(price - price * tp, price_precision)
-            if price_simple_median > tp_price:
+            if price_simple_median > 0 & price_simple_median > tp_price:
                 tp_price = round(price_simple_median, price_precision)
             resp3 = client.new_order(symbol=symbol, side='BUY', type='TAKE_PROFIT_MARKET', quantity=qty, timeInForce='GTC', stopPrice=tp_price)
             print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo: {resp3['type']}, Ordem: {resp3['orderId']}")
@@ -190,10 +191,10 @@ def bollinger_strategy(symbol):
     
     # Verificando se o preço está acima da banda superior
     if kl['Close'].iloc[-1] > kl['Upper'].iloc[-1]:
-        return ['down', simple_median.iloc[-1]]
+        return ['down', 0]
     # Verificando se o preço está abaixo da banda inferior
     elif kl['Close'].iloc[-1] < kl['Lower'].iloc[-1]:
-        return ['up', simple_median.iloc[-1]]
+        return ['up', 0]
     else:
         return ['none', 0]
 
@@ -214,7 +215,7 @@ while True:
         print(f"---------------> MEU SALDO: {round(balance, 2)} USDT - {get_hour()}")
         print("####################################################################")
         ## Se o saldo for menor que 35 USDT, você não pode mais operar
-        if balance < 30:
+        if balance < LIMIT_EXIT:
             print("---------------> SALDO LIMITE ATINGIDO. VOCÊ NÃO PODE MAIS OPERAR.")
             sys.exit()
         ## obtendo lista de posição:
