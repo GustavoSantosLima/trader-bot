@@ -17,7 +17,7 @@ volume = 50 # volume para uma ordem (volume / leverage = preço da ordem)
 leverage = 10  # alavancagem
 margin_mode = 'ISOLATED' # tipo é 'ISOLATED' ou 'CROSS'
 qty = 3 # Quantidade de posições abertas simultaneamente
-TIME_PERIOD = '5m' # período de tempo para velas
+TIME_PERIOD = '30m' # período de tempo para velas
 LIMIT_EXIT = 15 # limite de saldo para sair do programa
 
 # obtendo seu saldo de futuros em USDT
@@ -94,7 +94,7 @@ def open_order(symbol, side, price_simple_median):
     qty = round(volume/price, qty_precision)
     if side == 'buy':
         try:
-            resp1 = client.new_order(symbol=symbol, side='BUY', type='MARKET', quantity=qty)
+            resp1 = client.new_order(symbol=symbol, side='BUY', type='LIMIT', quantity=qty, timeInForce='GTC', price=price)
             print(f"$$$$$$$$$$$$$$$ => CRIANDO OPERAÇÃO DE {side.upper()} PARA {symbol}")
             print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo: {resp1['type']}, Ordem: {resp1['orderId']}")
             sleep(2)
@@ -103,15 +103,13 @@ def open_order(symbol, side, price_simple_median):
             print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo: {resp2['type']}, Ordem: {resp2['orderId']}")
             sleep(2)
             tp_price = round(price + price * tp, price_precision)
-            if price_simple_median > 0 & price_simple_median < tp_price:
-                tp_price = round(price_simple_median, price_precision)
             resp3 = client.new_order(symbol=symbol, side='SELL', type='TAKE_PROFIT_MARKET', quantity=qty, timeInForce='GTC', stopPrice=tp_price)
             print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo: {resp3['type']}, Ordem: {resp3['orderId']}")
         except ClientError as error:
             print(f"Erro encontrado. status: {error.status_code}, código de erro: {error.error_code}, mensagem de erro: {error.error_message}")
     if side == 'sell':
         try:
-            resp1 = client.new_order(symbol=symbol, side='SELL', type='MARKET', quantity=qty)
+            resp1 = client.new_order(symbol=symbol, side='SELL', type='LIMIT', quantity=qty, timeInForce='GTC', price=price)
             print(f"$$$$$$$$$$$$$$$ => CRIANDO OPERAÇÃO DE {side.upper()} PARA {symbol}")
             print(f"$$$$$$$$$$$$$$$ => Operação: VENDA, Tipo: {resp1['type']}, Ordem: {resp1['orderId']}")
             sleep(2)
@@ -120,8 +118,6 @@ def open_order(symbol, side, price_simple_median):
             print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo: {resp2['type']}, Ordem: {resp2['orderId']}")
             sleep(2)
             tp_price = round(price - price * tp, price_precision)
-            if price_simple_median > 0 & price_simple_median > tp_price:
-                tp_price = round(price_simple_median, price_precision)
             resp3 = client.new_order(symbol=symbol, side='BUY', type='TAKE_PROFIT_MARKET', quantity=qty, timeInForce='GTC', stopPrice=tp_price)
             print(f"$$$$$$$$$$$$$$$ => Operação: COMPRA, Tipo: {resp3['type']}, Ordem: {resp3['orderId']}")
         except ClientError as error:
